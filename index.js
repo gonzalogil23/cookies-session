@@ -5,6 +5,8 @@ let { productosRouter } = require("./routes/productos.js");
 let { Productos } = require("./models/productos.js");
 let { CRUDproductos } = require("./db/productos.js");
 let cookieParser = require("cookie-parser");
+const session = require("express-session");
+const MongoStore = require("connect-mongo");
 
 const http = require("http").Server(app);
 const PORT = 8080;
@@ -21,25 +23,56 @@ const io = require("socket.io")(http);
 
 app.use("/productos", productosRouter);
 
+app.use(
+  session({
+    store: MongoStore.create({
+      mongoUrl:
+        "mongodb+srv://gonzalogil:gonzalogil@cluster0.lvfuy.mongodb.net/cookies?retryWrites=true&w=majority",
+      mongoOptions: { useNewUrlParser: true, useUnifiedTopology: true },
+      ttl: 600,
+    }),
+    secret: "123456",
+    resave: false,
+    saveUninitialized: false,
+    rolling: true,
+    cookie: {
+      maxAge: 600000,
+    },
+  })
+);
+
 app.post("/login", (req, res) => {
   const { nombre } = req.body;
-
-  res.cookie("nombre", nombre, { maxAge: 60000 }).send(
-    `<span>Bienvenido ${nombre}</span> 
-    <form method="get" action="/logout">
-    <button type="submit" class="btn btn-primary" id="logoutButton">Salir</button>
-    </form>
-     `
-  );
+  req.session.nombre = nombre;
+  if (req.session.nombre) {
+    res.send(`Bienvenid@ ${nombre}`);
+    res.redirect("/");
+  }
+  // res.cookie("nombre", nombre, { maxAge: 60000 }).send(
+  //   `<span>Bienvenido ${nombre}</span>
+  //   <form method="get" action="/logout">
+  //   <button type="submit" class="btn btn-primary" id="logoutButton">Salir</button>
+  //   </form>
+  //    `
+  // );
 });
 
 app.get("/logout", (req, res) => {
-  const { nombre } = req.cookies;
-  res.clearCookie("nombre");
+  let nombre = req.session.nombre ? req.session.nombre : "";
+  if (nombre) {
+    req.session.destroy((err) => {
+      if (!err) res.send(`Logout ${nombre}`);
+      else res.redirect("/");
+    });
+  } else {
+    res.redirect("/");
+  }
+  // const { nombre } = req.cookies;
+  // res.clearCookie("nombre");
   // setTimeout(() => {
   //   res.redirect("/");
   // }, 2000);
-  res.send(`Hasta luego ${nombre}`);
+  // res.send(`Hasta luego ${nombre}`);
 });
 
 const mensajes = [];
